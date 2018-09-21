@@ -10,8 +10,8 @@ using namespace std;
 int main(int argc, char *argv[]) {
 
 	int M = (argc > 1) ? atoi(argv[1]) : 4096;
-	int N = (argc > 2) ? atoi(argv[2]) : 4096;
-	int K = (argc > 3) ? atoi(argv[3]) : 4096;
+	int N = (argc > 2) ? atoi(argv[2]) : M;
+	int K = (argc > 3) ? atoi(argv[3]) : M;
 	cout << M << ", " << N << ", " << K << ", ";
 
 	// prepare data

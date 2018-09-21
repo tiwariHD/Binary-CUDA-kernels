@@ -3,9 +3,9 @@ TARGET := benchmark
 LIBS := -L /opt/cuda-8.0/lib64
 CXXFLAGS := -arch=sm_35 -std=c++11 -O2
 
-all: conv
+all: bench
 
-conv: $(TARGET).cu
+bench: $(TARGET).cu
 	$(CXX) $(CXXFLAGS) $(HEADERS) $(LIBS) $(TARGET).cu -o $(TARGET) \
 	-lcublas
 
