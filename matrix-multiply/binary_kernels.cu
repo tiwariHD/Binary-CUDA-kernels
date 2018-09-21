@@ -1,5 +1,5 @@
-#ifndef GEMM_KERNELS
-#define GEMM_KERNELS
+#ifndef BINARY_KERNELS
+#define BINARY_KERNELS
 
 #include <stdio.h>
 #define BLOCK_SIZE 16

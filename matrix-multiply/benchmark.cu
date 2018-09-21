@@ -2,7 +2,7 @@
 #include <cmath>
 #include <chrono>
 #include <cublas_v2.h>
-#include "gemm_kernels.cu"
+#include "binary_kernels.cu"
 
 using namespace std;
 
@@ -257,7 +257,7 @@ int main(int argc, char *argv[]) {
 	printf("success: %d\n", check_result(result_gemm, result_xnor));
 	printf("success: %d\n", check_result(result_gemm, result_cublas));
 	printf("success: %d\n", check_result(result_gemm, result_my_xnortex));
-    printf("success: %d\n", check_result(result_gemm, result_magma));
+	printf("success: %d\n", check_result(result_gemm, result_magma));
 	*/
 
 	cudaFree(fA);
@@ -269,7 +269,7 @@ int main(int argc, char *argv[]) {
 	free(result_xnor);
 	//free(result_my_xnor);
 	free(result_my_xnortex);
-    free(result_magma);
+	free(result_magma);
 	free(result_cublas);
 
 	return 0;

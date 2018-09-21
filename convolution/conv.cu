@@ -8,8 +8,8 @@
 #include <chrono>
 #include <bitset>
 #include "conv_kernels.cu"
-#include "gemm_kernels.cu"
 
+//undef to exclude a particular method
 #define _CUBCOV
 #define _MAGCOV
 #define _CUDCOV
@@ -43,7 +43,8 @@ void printArBinZ(unsigned int* in, int depth, int row, int col) {
   for(int k = 0; k < depth; k++) {
     for (int i = 0; i < row; i++) {
         for (int j = 0; j < col; j++) {
-            std::cout << std::bitset<32>(in[(k * row * col) + (i * col) + j]).to_string() << " ";
+            std::cout << std::bitset<32>(in[(k * row * col) +
+                (i * col) + j]).to_string() << " ";
             //convertToBinary(in[(i * col) + j]);
             //std::cout << " ";
         }
@@ -58,16 +59,15 @@ int main(int argc, char* argv[]) {
     srand(time(NULL));
 
     int NITER = (argc > 1) ? std::atoi(argv[1]) : 1;
-    int batchS = (argc > 2) ? std::atoi(argv[2]) : 1;
-    int num_kernels = (argc > 3) ? std::atoi(argv[3]) : 128;
-    int chans = (argc > 4) ? std::atoi(argv[4]) : 128;
-    int IMG = (argc > 5) ? std::atoi(argv[5]) : 32;
-    int ksize = (argc > 6) ? std::atoi(argv[6]) : 3;
-    int stride = (argc > 7) ? std::atoi(argv[7]) : 1;
-    int pad = (argc > 8) ? std::atoi(argv[8]) : 1;
+    int num_kernels = (argc > 2) ? std::atoi(argv[2]) : 128;
+    int chans = (argc > 3) ? std::atoi(argv[3]) : 128;
+    int IMG = (argc > 4) ? std::atoi(argv[4]) : 32;
+    int ksize = (argc > 5) ? std::atoi(argv[5]) : 3;
+    int stride = (argc > 6) ? std::atoi(argv[6]) : 1;
+    int pad = (argc > 7) ? std::atoi(argv[7]) : 1;
 
-    std::cout << NITER << ", " << batchS << ", " << num_kernels << ", "
-            << chans << ", " << IMG << ", " << ksize << ", ";
+    std::cout << NITER << ", " << num_kernels << ", " << chans
+		<< ", " << IMG << ", " << ksize << ", ";
 
     int height = IMG;
     int width = IMG;
@@ -75,15 +75,16 @@ int main(int argc, char* argv[]) {
     int height_col = (height + 2 * pad - ksize) / stride + 1;
     int width_col = (width + 2 * pad - ksize) / stride + 1;
 
-    float *h_input = (float*)malloc(batchS * chans * height * width * sizeof(float));
-    for (int i = 0; i < (batchS * chans * height * width); i++) {
+    float *h_input = (float*)malloc(chans * height * width * sizeof(float));
+    for (int i = 0; i < (chans * height * width); i++) {
         double x = (double)rand() / RAND_MAX;
         h_input[i] = (x > 0.5) ? 1.0 : -1.0;
     }
 
     float* d_input{nullptr};
-    cudaMalloc(&d_input, batchS * chans * height * width * sizeof(float));
-    cudaMemcpy(d_input, h_input, batchS * chans * height * width * sizeof(float), cudaMemcpyHostToDevice);
+    cudaMalloc(&d_input, chans * height * width * sizeof(float));
+    cudaMemcpy(d_input, h_input, chans * height * width * sizeof(float),
+               cudaMemcpyHostToDevice);
 
 
     float *kernel_template = (float*)malloc(ksize * ksize * sizeof(float));
@@ -92,13 +93,14 @@ int main(int argc, char* argv[]) {
       kernel_template[vi] = (ix > 0.5) ? 1.0 : -1.0;
     }
 
-    float *h_kernel = (float*)malloc(num_kernels * chans * ksize * ksize * sizeof(float));
+    float *h_kernel = (float*)malloc(num_kernels * chans * ksize * ksize
+                    * sizeof(float));
     for (int kernel = 0; kernel < num_kernels; ++kernel) {
       for (int chan = 0; chan < chans; ++chan) {
         for (int row = 0; row < ksize; ++row) {
           for (int column = 0; column < ksize; ++column) {
-            h_kernel[(chans * ksize * ksize * kernel) + (ksize * ksize * chan) + (ksize * row) + column] = 
-            kernel_template[(row * ksize) + column];
+            h_kernel[(chans * ksize * ksize * kernel) + (ksize * ksize * chan)
+            + (ksize * row) + column] = kernel_template[(row * ksize) + column];
           }
         }
       }
@@ -108,11 +110,12 @@ int main(int argc, char* argv[]) {
     cudaMalloc(&d_kernel, num_kernels * chans * ksize * ksize * sizeof(float));
     cudaMemcpy(d_kernel, h_kernel, sizeof(h_kernel), cudaMemcpyHostToDevice);
 
-    //std::cout << "kernel: " << num_kernels << ", "  << chans << ", " << ksize << ", " << ksize << "\n";
-    //printArZ(h_kernel, 4, chans, ksize * ksize);
+    /*std::cout << "kernel: " << num_kernels << ", "  << chans << ", " <<
+            ksize << ", " << ksize << "\n";
+    //printArZ(h_kernel, 4, chans, ksize * ksize);*/
 
     float* d_output{nullptr};
-    int image_bytes_out = batchS * num_kernels * height_col * width_col * sizeof(float);
+    int image_bytes_out = num_kernels * height_col * width_col * sizeof(float);
     cudaMalloc(&d_output, image_bytes_out);
 
 
@@ -123,27 +126,29 @@ int main(int argc, char* argv[]) {
     cudaMemset(d_output, 0, image_bytes_out);
 
     unsigned int* d_input_conc{nullptr};
-    cudaMalloc(&d_input_conc,chans * height * width * sizeof(unsigned int) / 32);
-    cudaMemset(d_input_conc, 0, chans * height * width * sizeof(unsigned int) / 32);
+    cudaMalloc(&d_input_conc,chans * height * width * sizeof(unsigned int)/32);
+    cudaMemset(d_input_conc, 0, chans * height * width*sizeof(unsigned int)/32);
 
     unsigned int* d_kernel_conc{nullptr};
-    cudaMalloc(&d_kernel_conc, num_kernels * chans * ksize * ksize * sizeof(float) / 32);
-    cudaMemset(d_kernel_conc, 0, num_kernels * chans * ksize * ksize * sizeof(float) /32);
+    cudaMalloc(&d_kernel_conc, num_kernels * chans * ksize * ksize *
+        sizeof(float) / 32);
+    cudaMemset(d_kernel_conc, 0, num_kernels * chans * ksize * ksize *
+        sizeof(float) /32);
 
     unsigned int* d_imColArr{nullptr};
-    int imColArraySize = height_col * width_col * chans / 32 * ksize * ksize * sizeof(int);
+    int imColArraySize = height_col * width_col * chans / 32 * ksize * ksize *
+        sizeof(int);
     cudaMalloc(&d_imColArr, imColArraySize);
 
     int M1 = num_kernels;
     int N1 = chans / 32 * ksize * ksize;
     int K1 = height_col * width_col;
-    int inStride = chans * height * width;
-    int outStride = num_kernels * K1;
 
     auto start1 = std::chrono::high_resolution_clock::now();
     //for filter: (256 * 128 * 3 * 3); threads needed <= 9; blocks needed = 4
     int grid = num_kernels * chans / 32, block = ksize * ksize;
-    concatenate_input_kernel<<< grid, block >>>(d_kernel, d_kernel_conc, ksize, ksize);
+    concatenate_input_kernel<<< grid, block >>>(d_kernel, d_kernel_conc,
+        ksize, ksize);
     cudaDeviceSynchronize();
     auto end1 = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff1 = end1 - start1;
@@ -151,32 +156,28 @@ int main(int argc, char* argv[]) {
     grid = chans / 32;
     block = min(height, 256);
 
-    std::chrono::duration<double> diff2{0};
-    std::chrono::duration<double> diff3{0};
+    //for input:(128 * 32 * 32);threads needed <= 1024;blocks needed=128/32=4
+    auto start2 = std::chrono::high_resolution_clock::now();
+    concatenate_input_kernel<<< grid, block, 0 >>>(d_input, d_input_conc,
+        height, width);
+    cudaDeviceSynchronize();
+    auto end2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diff2 = (end2 - start2);
 
-    for (int i = 0; i < batchS; i++) {
+    auto start3 = std::chrono::high_resolution_clock::now();
+    im2col_gpu_int(d_input_conc, chans / 32, height, width, ksize, pad, stride,
+        d_imColArr, pad_val);
+    cudaDeviceSynchronize();
 
-        //for input: (128 * 32 * 32); threads needed <= 1024; blocks needed = 128/32 = 4
-        auto start2 = std::chrono::high_resolution_clock::now();
-        concatenate_input_kernel<<< grid, block, 0 >>>(d_input + (i * inStride), d_input_conc, height, width);
-        cudaDeviceSynchronize();
-        auto end2 = std::chrono::high_resolution_clock::now();
-        diff2 += (end2 - start2);
-
-        auto start3 = std::chrono::high_resolution_clock::now();
-        im2col_gpu_int(d_input_conc, chans / 32, height, width, ksize, pad, stride, d_imColArr, pad_val);
-        cudaDeviceSynchronize();
-
-        dim3 blockDim1(16, 16);
-        int gridSize1 = ceil(static_cast<float>(K1) / static_cast<float>(96));
-        int gridSize2 = ceil(static_cast<float>(M1) / static_cast<float>(96));
-        dim3 gridDim1(gridSize1, gridSize2);
-        my_xnor_gemm_kernel<<< gridDim1, blockDim1, 0 >>>(K1, M1, N1, d_imColArr, K1, d_kernel_conc,
-            N1, d_output + (i * outStride), K1, 0, 0);
-        cudaDeviceSynchronize();
-        auto end3 = std::chrono::high_resolution_clock::now();
-        diff3 += (end3 - start3);
-    }    
+    dim3 blockDim1(16, 16);
+    int gridSize1 = ceil(static_cast<float>(K1) / static_cast<float>(96));
+    int gridSize2 = ceil(static_cast<float>(M1) / static_cast<float>(96));
+    dim3 gridDim1(gridSize1, gridSize2);
+    my_xnor_gemm_kernel<<< gridDim1, blockDim1, 0 >>>(K1, M1, N1, d_imColArr,
+        K1, d_kernel_conc, N1, d_output, K1, 0, 0);
+    cudaDeviceSynchronize();
+    auto end3 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diff3 = (end3 - start3);   
     
     float* h_output = (float*)malloc(image_bytes_out);
     memset(h_output, 0, image_bytes_out);
@@ -209,8 +210,10 @@ int main(int argc, char* argv[]) {
     mtym[0] /= NITER;
     mtym[1] /= NITER;
     mtym[2] /= NITER;
-    //std::cout << "--------magma time: " << std::fixed << mtym.first << " s, " << mtym.second << " s\n";
-    std::cout << std::fixed << mtym[0] << ", " << mtym[1] << ", " << mtym[2] << ", ";
+    //std::cout << "--------magma time: " << std::fixed << mtym.first << " s,
+        //<< mtym.second << " s\n";
+    std::cout << std::fixed << mtym[0] << ", " << mtym[1] << ", " << mtym[2]
+        << ", ";
 
 #endif
 
@@ -224,27 +227,24 @@ int main(int argc, char* argv[]) {
     cudaMemset(d_output, 0, image_bytes_out);
 
     float* d_imColArr{nullptr};
-    int imColArraySize = height_col * width_col * chans * ksize * ksize * sizeof(int);
+    int imColArraySize = height_col * width_col * chans * ksize * ksize
+        * sizeof(int);
     cudaMalloc(&d_imColArr, imColArraySize);
 
     float alpha = 1.0, beta = 0.0;
     int M1 = num_kernels;
     int N1 = chans * ksize * ksize;
     int K1 = height_col * width_col;
-    int inStride = chans * height * width;
-    int outStride = num_kernels * K1;
 
     auto start = std::chrono::high_resolution_clock::now();
-
-    for (int i = 0; i < batchS; i++) {
     
-        im2col_gpu_float(d_input + (i * inStride), chans, height, width, ksize, pad, stride, d_imColArr, 0);
-        cudaDeviceSynchronize();
+    im2col_gpu_float(d_input, chans, height, width,
+        ksize, pad, stride, d_imColArr, 0);
+    cudaDeviceSynchronize();
   
-        cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, K1, M1, N1, &alpha,
-            d_imColArr, K1, d_kernel, N1, &beta, d_output + (i * outStride), K1);
-        cudaDeviceSynchronize();
-    }
+    cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, K1, M1, N1, &alpha,
+        d_imColArr, K1, d_kernel, N1, &beta, d_output, K1);
+    cudaDeviceSynchronize();
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> diff = end - start;
@@ -265,7 +265,8 @@ int main(int argc, char* argv[]) {
     }
     cutym /= NITER;
     //std::cout << "--------cublas time: " << std::fixed << cutym << " s\n";
-    std::cout << std::fixed << cutym << ", ";
+    //std::cout << std::fixed << cutym << ", ";
+    std::cout << std::fixed << cutym << "\n";
 
     cublasDestroy(handle);
 #endif
@@ -280,7 +281,7 @@ int main(int argc, char* argv[]) {
     cudaMemset(d_output, 0, image_bytes_out);
 
     const float alpha = 1.0f, beta = 0.0f;
-    int batchSize = batchS;
+    int batchSize = 1;
     int batch_size{0}, channelC{0}, heightC{0}, widthC{0}; 
     size_t workspace_bytes = 0;
     void* d_workspace{nullptr};
@@ -391,7 +392,7 @@ int main(int argc, char* argv[]) {
 
     return diff.count();
   };
-    double cdtym = 0;
+    double cdtym = 0.0;
     for (int i = 0; i < NITER; i++) {
         cdtym += cudnn_conv();
     }
